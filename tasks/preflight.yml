@@ -36,23 +36,11 @@
       - sendy_install_zip_src | length > 0
       - sendy_install_url | length > 0
       - sendy_install_db_password | length > 0
-      - sendy_install_encryption_key | length > 0
     fail_msg: >
       One or more required variables are empty. Set sendy_install_zip_src,
-      sendy_install_url, sendy_install_db_password, and
-      sendy_install_encryption_key in host_vars before running this role.
+      sendy_install_url, and sendy_install_db_password in host_vars
+      before running this role.
     quiet: true
-
-- name: "Preflight | Assert encryption key is exactly 32 characters"
-  ansible.builtin.assert:
-    that:
-      - sendy_install_encryption_key | length == 32
-    fail_msg: >
-      sendy_install_encryption_key must be exactly 32 characters
-      (got {{ sendy_install_encryption_key | length }}). Generate one with:
-      openssl rand -hex 16
-    quiet: true
-    no_log: true
 
 - name: "Preflight | Check that the Sendy zip exists on the control node"
   ansible.builtin.stat:
@@ -68,6 +56,44 @@
       control node. Stage the purchased Sendy zip at this path and set
       sendy_install_zip_src accordingly.
   when: not _sendy_install_zip_stat.stat.exists
+
+- name: "Preflight | Parse Sendy version from the zip filename"
+  ansible.builtin.set_fact:
+    _sendy_install_zip_version: "{{ sendy_install_zip_src | basename | regex_search('([0-9]+\\.[0-9]+\\.[0-9]+)') }}"
+
+- name: "Preflight | Fail if no semantic version could be parsed from the zip filename"
+  ansible.builtin.fail:
+    msg: >
+      Could not parse a semantic version (X.Y.Z) from the filename
+      {{ sendy_install_zip_src | basename }}. Sendy releases are named
+      like sendy-7.0.6.zip — rename the file to match that pattern, or
+      verify sendy_install_zip_src points at a genuine Sendy release zip.
+  when: not _sendy_install_zip_version
+
+- name: "Preflight | Check for a version marker from a previous install"
+  ansible.builtin.stat:
+    path: "{{ sendy_install_version_marker }}"
+  register: _sendy_install_version_marker_stat
+
+- name: "Preflight | Read the previous install's recorded version"
+  ansible.builtin.slurp:
+    src: "{{ sendy_install_version_marker }}"
+  register: _sendy_install_version_marker_slurp
+  when: _sendy_install_version_marker_stat.stat.exists
+
+- name: "Preflight | Fail if the zip is the same version or older than the last install"
+  ansible.builtin.fail:
+    msg: >
+      {{ sendy_install_zip_src | basename }} is version
+      {{ _sendy_install_zip_version }}, which is not newer than
+      {{ _sendy_install_version_marker_slurp.content | b64decode | trim }}
+      already recorded at {{ sendy_install_version_marker }}. Refusing to
+      install the same or an older version over a newer one. Set
+      sendy_install_force_reinstall: true to bypass this for testing.
+  when:
+    - not sendy_install_force_reinstall
+    - _sendy_install_version_marker_stat.stat.exists
+    - _sendy_install_zip_version is version(_sendy_install_version_marker_slurp.content | b64decode | trim, '<=')
 
 - name: "Preflight | Check whether Sendy is already installed"
   ansible.builtin.stat:

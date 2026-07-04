@@ -13,6 +13,15 @@ argument_specs:
       installs only; use the sibling realtime.sendy role to upgrade an
       existing install.
     options:
+      sendy_install_packages:
+        type: list
+        elements: str
+        default: [unzip, rsync, cron]
+        description: >-
+          Packages this role installs directly because its own tasks
+          depend on them (unzip for ansible.builtin.unarchive, rsync for
+          ansible.posix.synchronize, cron for ansible.builtin.cron's
+          crontab binary) -- not general OS package management.
       sendy_install_dir:
         type: str
         default: /var/www/html/sendy
@@ -58,23 +67,38 @@ argument_specs:
           Required. Full path to the purchased Sendy zip on the Ansible
           control node. Enforced non-empty by preflight, not by this
           argument spec, so the friendlier preflight error message fires.
+          Preflight also parses a semantic version (X.Y.Z) from this
+          file's basename (e.g. sendy-7.0.6.zip) and fails if it isn't
+          newer than sendy_install_version_marker's recorded version.
+      sendy_install_version_marker:
+        type: str
+        default: /var/lib/sendy_install/version
+        description: >-
+          Path on the target host where this role records the Sendy
+          version it last installed, parsed from sendy_install_zip_src's
+          filename. Preflight fails if a new zip's version is the same
+          as or older than what's recorded here.
+      sendy_install_force_reinstall:
+        type: bool
+        default: false
+        description: >-
+          Testing escape hatch. Bypasses only the same-or-older-version
+          guard against sendy_install_version_marker -- does not bypass
+          the separate guard that fails if Sendy is already installed at
+          sendy_install_dir. Leave false in production.
       sendy_install_url:
         type: str
         default: ""
         description: >-
-          Required. Public URL Sendy will be served from, written into
-          config.php's INSTALL_URL. Enforced non-empty by preflight.
-      sendy_install_timezone:
-        type: str
-        default: UTC
-        description: PHP timezone identifier written into config.php.
-      sendy_install_encryption_key:
+          Required. Full public URL Sendy will be served from, without a
+          trailing slash, written into config.php's APP_PATH. Enforced
+          non-empty by preflight.
+      sendy_install_cookie_domain:
         type: str
         default: ""
         description: >-
-          Required. 32-character random string written into config.php's
-          ENCRYPTION_KEY. Enforced non-empty and exactly 32 characters by
-          preflight.
+          Domain written into config.php's COOKIE_DOMAIN. Left empty by
+          default per Sendy's own documentation.
       sendy_install_db_host:
         type: str
         default: 127.0.0.1
@@ -97,6 +121,10 @@ argument_specs:
         description: >-
           Required. Password for the pre-provisioned Sendy database
           user. Enforced non-empty by preflight. Never logged.
+      sendy_install_db_charset:
+        type: str
+        default: utf8mb4
+        description: MySQL character set config.php connects with.
       sendy_install_manage_cron:
         type: bool
         default: true

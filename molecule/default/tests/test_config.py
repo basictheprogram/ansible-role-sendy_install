@@ -2,16 +2,19 @@
 
 Each rendered value gets its own single-purpose test function -- never
 combine an existence/permission check and a content check in one test.
-Secret values (DB password, encryption key) are checked for presence of
-the constant only, never for their actual value, so nothing sensitive
-ends up in test output or a failure traceback.
+Secret values (DB password) are checked for presence of the variable
+assignment only, never for their actual value, so nothing sensitive ends
+up in test output or a failure traceback.
+
+Field names verified 2026-07-04 against a real production
+includes/config.php (Sendy 7.0.6) -- see templates/config.php.j2.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._data import DB_HOST, DB_NAME, DB_USERNAME, INSTALL_DIR, INSTALL_URL, TIMEZONE, WEB_GROUP, WEB_USER
+from ._data import APP_PATH, COOKIE_DOMAIN, DB_CHARSET, DB_HOST, DB_NAME, DB_USERNAME, INSTALL_DIR, WEB_GROUP, WEB_USER
 
 if TYPE_CHECKING:
     from testinfra.host import Host
@@ -36,36 +39,36 @@ def test_config_file_owner(host: Host) -> None:
     assert f.group == WEB_GROUP
 
 
+def test_config_contains_app_path(host: Host) -> None:
+    content = host.file(CONFIG_PATH).content_string
+    assert f"define('APP_PATH', '{APP_PATH}')" in content
+
+
 def test_config_contains_db_host(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert f"define('HOST', '{DB_HOST}')" in content
+    assert f"$dbHost = '{DB_HOST}'" in content
 
 
 def test_config_contains_db_name(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert f"define('DB_NAME', '{DB_NAME}')" in content
+    assert f"$dbName = '{DB_NAME}'" in content
 
 
 def test_config_contains_db_username(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert f"define('DB_USERNAME', '{DB_USERNAME}')" in content
+    assert f"$dbUser = '{DB_USERNAME}'" in content
 
 
-def test_config_contains_install_url(host: Host) -> None:
+def test_config_contains_db_charset(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert f"define('INSTALL_URL', '{INSTALL_URL}')" in content
+    assert f"$charset = '{DB_CHARSET}'" in content
 
 
-def test_config_contains_timezone(host: Host) -> None:
+def test_config_contains_cookie_domain(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert f"define('TIMEZONE', '{TIMEZONE}')" in content
+    assert f"define('COOKIE_DOMAIN', '{COOKIE_DOMAIN}')" in content
 
 
-def test_config_defines_db_password_constant(host: Host) -> None:
+def test_config_defines_db_password_variable(host: Host) -> None:
     content = host.file(CONFIG_PATH).content_string
-    assert "define('DB_PASSWORD'," in content
-
-
-def test_config_defines_encryption_key_constant(host: Host) -> None:
-    content = host.file(CONFIG_PATH).content_string
-    assert "define('ENCRYPTION_KEY'," in content
+    assert "$dbPass = " in content

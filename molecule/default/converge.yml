@@ -12,7 +12,7 @@
 
   vars:
     sendy_install_fixture_dir: /tmp/molecule-sendy-fixture
-    sendy_install_fixture_zip: /tmp/molecule-sendy-fixture.zip
+    sendy_install_fixture_zip: /tmp/sendy-9.9.9.zip
 
   tasks:
     - name: "Fixture | Remove stale fixture directory and zip"
@@ -81,17 +81,12 @@
       when: ansible_facts.os_family == 'RedHat'
 
   vars:
-    sendy_install_zip_src: /tmp/molecule-sendy-fixture.zip
+    sendy_install_zip_src: /tmp/sendy-9.9.9.zip
     sendy_install_dir: /var/www/html/sendy
     sendy_install_staging_dir: /tmp/sendy_install
     sendy_install_web_user: www-data
     sendy_install_web_group: www-data
     sendy_install_url: https://sendy.example.com
-    sendy_install_timezone: America/Chicago
-    # Test-only value — never a real secret. Deliberately low-entropy
-    # (repeated pattern) so secret-scanners don't mistake it for a real
-    # key. 32 characters exactly, as sendy_install_encryption_key requires.
-    sendy_install_encryption_key: "TESTTESTTESTTESTTESTTESTTESTTEST"
     sendy_install_db_host: 127.0.0.1
     sendy_install_db_name: sendy_test
     sendy_install_db_username: sendy_test

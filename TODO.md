@@ -7,120 +7,48 @@ follow-ups, not regressions.
 
 ## Needs manual action
 
-### `.pre-commit-config.yaml` could not be written
+### `.pre-commit-config.yaml` — resolved 2026-07-04 (applied by hand)
 
-Cowork blocked writing this file with "resolves to a protected
-location" (a known, recurring issue — see this repo's
-`ansible-sync-role` skill `references/known-issues.md`). Apply this
-file by hand:
+Cowork couldn't write this file itself ("resolves to a protected
+location" — a known, recurring issue, see this repo's `ansible-sync-role`
+skill `references/known-issues.md`), so Bob copied it in manually. The
+applied file matches the version proposed here functionally (the
+`jumanjihouse/pre-commit-hooks` block just has more of its unused hooks
+listed as comments) — no further action needed.
 
-```yaml
----
-default_stages: [pre-commit]
+### Git repository — resolved 2026-07-04
 
-repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
-    hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
-        args: ["--maxkb=600"]
-      - id: detect-private-key
-      - id: check-shebang-scripts-are-executable
-      - id: file-contents-sorter
-        files: requirements.txt|\.gitignore|\.dockerignore
+`git init` and `origin` (`git@github.com:basictheprogram/ansible-role-sendy_install.git`)
+are done — the role now has its own history on branch `ansible-core-2.20`
+with one commit. This also resolves `meta/main.yml`'s `issue_tracker_url`
+placeholder, which pointed at this same URL — it's no longer a
+placeholder as long as the GitHub repo itself exists at that path (this
+session's sandbox has no network access to GitHub to confirm that
+directly).
 
-  - repo: https://github.com/adrienverge/yamllint.git
-    rev: v1.38.0
-    hooks:
-      - id: yamllint
-        files: \.(yaml|yml)$
-        types: [file, yaml]
-        entry: yamllint --strict -f parsable
+Still unconfirmed from inside this role's directory (out of scope for
+what's mounted in this session — verify from the `ansible-playbooks`
+superproject):
 
-  - repo: https://github.com/zricethezav/gitleaks
-    rev: v8.30.0
-    hooks:
-      - id: gitleaks
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.16
-    hooks:
-      - id: ruff
-        name: Ruff check
-        description: "Run 'ruff check' for extremely fast Python linting"
-        args: [--fix]
-
-      - id: ruff-format
-        name: Ruff format
-        description: "Run 'ruff format' for extremely fast Python formatting"
-
-  - repo: https://github.com/hadolint/hadolint
-    rev: v2.14.0
-    hooks:
-      - id: hadolint
-        name: Lint Dockerfiles
-        description: Runs hadolint to lint Dockerfiles
-        language: system
-        types: ["dockerfile"]
-        entry: hadolint
-
-  - repo: local
-    hooks:
-      - id: ansible-lint
-        name: Ansible Lint
-        language: system
-        entry: ansible-lint
-        files: \.(yaml|yml)$
-        pass_filenames: false
-
-  - repo: https://github.com/jumanjihouse/pre-commit-hooks
-    rev: 3.0.0
-    hooks:
-      - id: shellcheck
-      - id: shfmt
-
-ci:
-  autoupdate_schedule: weekly
-```
-
-### No git repository yet
-
-Unlike its sibling roles under `roles/git_repository/`, this directory
-has no `.git` of its own — it's untracked content inside the
-`ansible-playbooks` superproject's working tree. To match the project
-convention:
-
-1. `git init` this directory as its own repository.
-2. Create the actual GitHub (or GitLab) repo and add it as `origin`.
-3. Add a `roles/realtime.sendy_install -> git_repository/ansible-role-sendy_install`
-   symlink from the `ansible-playbooks` roles root, matching the
+1. The `roles/realtime.sendy_install -> git_repository/ansible-role-sendy_install`
+   symlink from the superproject's roles root, matching the
    `realtime.sendy -> git_repository/ansible-role-sendy` pattern.
-4. Register it wherever new roles get declared for this project (checked
-   `.gitmodules` and `requirements.yml` — neither currently reference
-   this role name; there may be another mechanism not found in this
-   session).
-
-### `meta/main.yml`'s `issue_tracker_url` is a placeholder
-
-Set to `https://github.com/basictheprogram/ansible-role-sendy_install/issues`,
-following the sibling `realtime.sendy` role's naming convention on
-GitHub — but that repository does not actually exist yet (see above).
-Fix this URL once the real repo is created, if it ends up somewhere else.
+2. Registration wherever new roles get declared for this project
+   (`.gitmodules`, `requirements.yml`, or another mechanism).
 
 ## Needs verification before production use
 
-### `templates/config.php.j2` field names are unverified
+### `templates/config.php.j2` field names — resolved 2026-07-04
 
-Sendy is closed-source. This template was written from public/community
-knowledge of `includes/config.php`'s constants (`HOST`, `DB_PORT`,
-`DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`, `INSTALL_URL`, `TIMEZONE`,
-`ENCRYPTION_KEY`). Compare it against the actual `includes/config.php`
-(or a `config.php.example`, if one ships) inside a real licensed Sendy
-zip before the first production run, and fix the template if a constant
-name differs by version.
+Verified against a real production `includes/config.php` (Sendy 7.0.6)
+after a live run hit `Undefined constant "APP_PATH"`. The template,
+`defaults/main.yml`, `meta/argument_specs.yml`, and `tasks/preflight.yml`
+were all fixed to match — see `DESIGN.md`'s Settled decisions section
+for the full list of changes, including the removal of
+`sendy_install_timezone` and `sendy_install_encryption_key` (neither
+exists in real Sendy config.php) and the addition of
+`sendy_install_db_charset` / `sendy_install_cookie_domain`. This was a
+breaking change to the role's public interface.
 
 ### `sendy_install_cron_jobs` may not cover every required cron script
 

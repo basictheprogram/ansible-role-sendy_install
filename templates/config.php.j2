@@ -3,21 +3,21 @@
   Managed by ansible-role-sendy_install. Manual edits will be overwritten
   on the next run of this role.
 
-  NOTE: field names below match Sendy's documented includes/config.php
-  as of this role's authoring. Sendy is closed-source — verify these
-  constants against the config.php shipped inside your own licensed zip
-  (compare with includes/config.php.example if present) before relying
-  on this in production, and adjust here if a newer Sendy release has
-  renamed or added constants.
+  Field names verified 2026-07-04 against a real production
+  includes/config.php (Sendy 7.0.6). Sendy is closed-source — re-verify
+  against includes/config.php.example if a future Sendy release renames
+  or adds constants.
 #}
 <?php
 
-define('HOST', '{{ sendy_install_db_host }}');
-define('DB_PORT', '{{ sendy_install_db_port }}');
-define('DB_USERNAME', '{{ sendy_install_db_username }}');
-define('DB_PASSWORD', '{{ sendy_install_db_password }}');
-define('DB_NAME', '{{ sendy_install_db_name }}');
+define('APP_PATH', '{{ sendy_install_url }}');
 
-define('INSTALL_URL', '{{ sendy_install_url }}');
-define('TIMEZONE', '{{ sendy_install_timezone }}');
-define('ENCRYPTION_KEY', '{{ sendy_install_encryption_key }}');
+$dbHost = '{{ sendy_install_db_host }}';
+$dbUser = '{{ sendy_install_db_username }}';
+$dbPass = '{{ sendy_install_db_password }}';
+$dbName = '{{ sendy_install_db_name }}';
+
+$charset = '{{ sendy_install_db_charset }}';
+$dbPort = {{ sendy_install_db_port }};
+
+define('COOKIE_DOMAIN', '{{ sendy_install_cookie_domain }}');

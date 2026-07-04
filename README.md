@@ -62,6 +62,7 @@ Full descriptions and types are also documented in `meta/argument_specs.yml`.
 
 | Variable | Default | Description |
 |---|---|---|
+| `sendy_install_packages` | `[unzip, rsync, cron]` | Packages this role installs directly (its own tasks depend on them) |
 | `sendy_install_dir` | `/var/www/html/sendy` | Live Sendy web root on the remote host |
 | `sendy_install_staging_dir` | `/tmp/sendy_install` | Temp dir on remote for extraction |
 | `sendy_install_web_user` | `www-data` | Web server process user |
@@ -69,21 +70,23 @@ Full descriptions and types are also documented in `meta/argument_specs.yml`.
 | `sendy_install_dir_mode` | `"0755"` | Mode for directories this role creates directly |
 | `sendy_install_writable_dirs` | `[uploads]` | Subdirs needing group-writable permissions |
 | `sendy_install_writable_dir_mode` | `"0775"` | Mode applied to `sendy_install_writable_dirs` |
-| `sendy_install_zip_src` | `""` | **Required.** Path to zip on Ansible control node |
-| `sendy_install_url` | `""` | **Required.** Public URL Sendy is served from |
-| `sendy_install_timezone` | `UTC` | PHP timezone written into `config.php` |
-| `sendy_install_encryption_key` | `""` | **Required.** 32-character key written into `config.php` |
+| `sendy_install_zip_src` | `""` | **Required.** Path to zip on Ansible control node. Filename must contain a semver (e.g. `sendy-7.0.6.zip`) |
+| `sendy_install_version_marker` | `/var/lib/sendy_install/version` | Where the installed Sendy version is recorded, for the same-or-older guard |
+| `sendy_install_force_reinstall` | `false` | Testing only. Bypasses the same-or-older-version guard; does not bypass the already-installed guard |
+| `sendy_install_url` | `""` | **Required.** Full public URL Sendy is served from, written into `config.php`'s `APP_PATH` |
+| `sendy_install_cookie_domain` | `""` | Domain written into `config.php`'s `COOKIE_DOMAIN` |
 | `sendy_install_db_host` | `127.0.0.1` | Pre-provisioned database host |
 | `sendy_install_db_port` | `3306` | Pre-provisioned database port |
 | `sendy_install_db_name` | `sendy` | Pre-provisioned database name |
 | `sendy_install_db_username` | `sendy` | Pre-provisioned database user |
 | `sendy_install_db_password` | `""` | **Required.** Pre-provisioned database password. Never logged |
+| `sendy_install_db_charset` | `utf8mb4` | MySQL character set `config.php` connects with |
 | `sendy_install_manage_cron` | `true` | Whether this role manages Sendy's cron jobs |
 | `sendy_install_cron_user` | `{{ sendy_install_web_user }}` | User the cron jobs run as |
 | `sendy_install_cron_jobs` | see `defaults/main.yml` | Cron job entries passed to `ansible.builtin.cron` |
 
 This role has no OS-specific overrides in `vars/` — Debian and Ubuntu use
-the same web user and this role installs no packages itself.
+the same web user and the same package names for `sendy_install_packages`.
 
 ---
 
@@ -91,14 +94,22 @@ the same web user and this role installs no packages itself.
 
 1. **Preflight** (`tasks/preflight.yml`) — asserts ansible-core version,
    supported OS family, all required variables are set, the encryption
-   key is exactly 32 characters, the zip exists on the control node, and
-   that Sendy is *not* already installed at the target directory.
+   key is exactly 32 characters, the zip exists on the control node,
+   parses a semantic version from the zip's filename and fails if it's
+   the same as or older than `sendy_install_version_marker`'s recorded
+   value, and that Sendy is *not* already installed at the target
+   directory.
 2. **Load OS-specific variables** — `include_vars` with `first_found`
    against `vars/` (currently a no-op; see above).
-3. **Install** (`tasks/install.yml`) — uploads and extracts the zip to a
-   staging directory, writes `includes/config.php`, syncs the result into
-   `sendy_install_dir`, sets permissions on writable directories and
-   `config.php`, then removes the staging directory.
+3. **Install** (`tasks/install.yml`) — uploads the zip to a staging
+   directory, updates the apt cache and installs `sendy_install_packages`
+   (`unzip`, `rsync`, and `cron` by default — required by
+   `ansible.builtin.unarchive`, `ansible.posix.synchronize`, and
+   `ansible.builtin.cron` respectively), extracts the zip, writes
+   `includes/config.php`, syncs the result into `sendy_install_dir`,
+   sets permissions on writable directories and `config.php`, removes
+   the staging directory, then records the installed version at
+   `sendy_install_version_marker`.
 4. **Cron** (`tasks/cron.yml`) — creates the send-queue cron job(s).
 
 ---
@@ -111,7 +122,6 @@ Set the required host-specific variables in `host_vars/<hostname>.yml`:
 sendy_install_zip_src: /mnt/sendy_releases/sendy.zip
 sendy_install_url: https://sendy.example.com
 sendy_install_db_password: "{{ vault_sendy_db_password }}"
-sendy_install_encryption_key: "{{ vault_sendy_encryption_key }}"
 ```
 
 Then run:

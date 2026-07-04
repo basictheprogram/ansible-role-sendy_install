@@ -4,6 +4,7 @@
 .env
 .venv/
 __pycache__/
+files/*.zip
 molecule/.cache/
 venv/
 zzz.diff

@@ -84,12 +84,15 @@ verifier:
     p: "no:cacheprovider"
 
 scenario:
+  # No 'idempotence' step: this role is deliberately not idempotent in
+  # the "safe to reconverge" sense. It fails on a second run by design
+  # (Sendy already installed, and now also a same-or-older zip version)
+  # — see DESIGN.md's Settled decisions.
   test_sequence:
     - dependency
     - destroy
     - syntax
     - create
     - converge
-    - idempotence
     - verify
     - destroy

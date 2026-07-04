@@ -26,6 +26,17 @@
     group: "{{ sendy_install_web_group }}"
     mode: "0640"
 
+- name: "Install | Update apt cache"
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+  changed_when: false
+
+- name: "Install | Ensure required packages are installed"
+  ansible.builtin.apt:
+    name: "{{ sendy_install_packages }}"
+    state: present
+
 - name: "Install | Extract zip into staging directory"
   ansible.builtin.unarchive:
     src: "{{ sendy_install_staging_dir }}/sendy-install.zip"
@@ -112,3 +123,17 @@
   ansible.builtin.file:
     path: "{{ sendy_install_staging_dir }}"
     state: absent
+
+# ── Record installed version ────────────────────────────────────────────────
+
+- name: "Install | Ensure the version marker's parent directory exists"
+  ansible.builtin.file:
+    path: "{{ sendy_install_version_marker | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: "Install | Record the installed Sendy version"
+  ansible.builtin.copy:
+    content: "{{ _sendy_install_zip_version }}\n"
+    dest: "{{ sendy_install_version_marker }}"
+    mode: "0644"

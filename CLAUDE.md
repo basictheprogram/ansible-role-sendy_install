@@ -101,20 +101,19 @@ flag the discrepancy and ask before fixing the design to match the code.
 ### Design notes
 
 See `DESIGN.md` — scope, settled decisions (zip-on-control-node source,
-pre-provisioned database assumption, Apache-only, supported platforms),
-and open questions (unverified `config.php` field names, possibly
+pre-provisioned database assumption, Apache-only, supported platforms,
+verified `config.php` field names), and open questions (possibly
 incomplete cron script list).
 
 ### Secrets
 
-Role-specific secret variable names:
+Role-specific secret variable name:
 
 * `sendy_install_db_password`
-* `sendy_install_encryption_key`
 
-Both are enforced non-empty by `tasks/preflight.yml` and never appear in
+Enforced non-empty by `tasks/preflight.yml` and never appears in
 `ansible.builtin.debug` output. The task that templates `config.php`
-(which embeds both) is marked `no_log: true`. Production values are
+(which embeds it) is marked `no_log: true`. Production values are
 managed via `ansible-vault` in the inventory repo, not in this role.
 
 ### Commit scopes
@@ -155,13 +154,12 @@ commit. Stop and verify between items.
    (`ansible.posix`, `community.general`)
 10. `.github/workflows/ci.yml` — ⬜ does not exist yet; no CI badge in
     README either, so add both together when CI is set up
-11. `meta/main.yml`'s `issue_tracker_url` — ⬜ points at
-    `github.com/basictheprogram/ansible-role-sendy_install`, following the
-    sibling `realtime.sendy` role's naming convention, but no such
-    repository has actually been created yet — confirm/create it and fix
-    the URL if this role ends up living somewhere else
-12. `.pre-commit-config.yaml` — ⬜ blocked from writing in this Cowork
-    session (see `TODO.md`); apply it by hand from the diff there
+11. `meta/main.yml`'s `issue_tracker_url` — ✅ resolved 2026-07-04; the
+    role now has its own git history with `origin` set to
+    `git@github.com:basictheprogram/ansible-role-sendy_install.git`,
+    matching the URL already in `meta/main.yml`
+12. `.pre-commit-config.yaml` — ✅ done; applied by hand (Cowork couldn't
+    write it directly, see `TODO.md`)
 
 ### Consumer side notes
 
