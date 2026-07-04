@@ -1,0 +1,119 @@
+---
+argument_specs:
+  main:
+    short_description: >-
+      First-time install of Sendy on Debian/Ubuntu, against a
+      pre-provisioned web server, PHP, and database.
+    description: >-
+      Extracts a purchased Sendy release zip staged on the Ansible
+      control node, writes includes/config.php, sets ownership and
+      permissions, and wires up the send-queue cron job. Does not
+      install the web server, PHP, or database, and does not create the
+      database, user, or schema — those must already exist. This role
+      installs only; use the sibling realtime.sendy role to upgrade an
+      existing install.
+    options:
+      sendy_install_dir:
+        type: str
+        default: /var/www/html/sendy
+        description: Absolute path to the Sendy web root on the remote host.
+      sendy_install_staging_dir:
+        type: str
+        default: /tmp/sendy_install
+        description: >-
+          Temp directory on the remote host used to extract the build
+          before it is synced into sendy_install_dir. Wiped at the start
+          and end of every run.
+      sendy_install_web_user:
+        type: str
+        default: www-data
+        description: System user that owns installed files and runs PHP.
+      sendy_install_web_group:
+        type: str
+        default: www-data
+        description: System group that owns installed files.
+      sendy_install_dir_mode:
+        type: str
+        default: "0755"
+        description: >-
+          Permission mode applied to directories this role creates
+          directly (staging dir, install dir's parent). The extracted
+          Sendy tree keeps the symbolic mode applied during extraction
+          instead, which differentiates files from directories.
+      sendy_install_writable_dirs:
+        type: list
+        elements: str
+        default: [uploads]
+        description: >-
+          Subdirectories (relative to sendy_install_dir) that Sendy
+          writes to at runtime and need group-writable permissions.
+      sendy_install_writable_dir_mode:
+        type: str
+        default: "0775"
+        description: Permission mode applied to sendy_install_writable_dirs.
+      sendy_install_zip_src:
+        type: str
+        default: ""
+        description: >-
+          Required. Full path to the purchased Sendy zip on the Ansible
+          control node. Enforced non-empty by preflight, not by this
+          argument spec, so the friendlier preflight error message fires.
+      sendy_install_url:
+        type: str
+        default: ""
+        description: >-
+          Required. Public URL Sendy will be served from, written into
+          config.php's INSTALL_URL. Enforced non-empty by preflight.
+      sendy_install_timezone:
+        type: str
+        default: UTC
+        description: PHP timezone identifier written into config.php.
+      sendy_install_encryption_key:
+        type: str
+        default: ""
+        description: >-
+          Required. 32-character random string written into config.php's
+          ENCRYPTION_KEY. Enforced non-empty and exactly 32 characters by
+          preflight.
+      sendy_install_db_host:
+        type: str
+        default: 127.0.0.1
+        description: Hostname of the pre-provisioned Sendy database.
+      sendy_install_db_port:
+        type: int
+        default: 3306
+        description: Port of the pre-provisioned Sendy database.
+      sendy_install_db_name:
+        type: str
+        default: sendy
+        description: Name of the pre-provisioned Sendy database.
+      sendy_install_db_username:
+        type: str
+        default: sendy
+        description: Username for the pre-provisioned Sendy database.
+      sendy_install_db_password:
+        type: str
+        default: ""
+        description: >-
+          Required. Password for the pre-provisioned Sendy database
+          user. Enforced non-empty by preflight. Never logged.
+      sendy_install_manage_cron:
+        type: bool
+        default: true
+        description: Whether this role manages Sendy's cron jobs at all.
+      sendy_install_cron_user:
+        type: str
+        default: "{{ sendy_install_web_user }}"
+        description: System user the cron jobs run as.
+      sendy_install_cron_jobs:
+        type: list
+        elements: dict
+        default:
+          - name: "sendy_install: process send queue"
+            minute: "*/1"
+            job: "php {{ sendy_install_dir }}/cron/campaigns.php > /dev/null 2>&1"
+        description: >-
+          Cron job entries passed directly to ansible.builtin.cron. The
+          default covers Sendy's documented send-queue processor only —
+          add entries here for any additional cron scripts your Sendy
+          version's documentation lists.

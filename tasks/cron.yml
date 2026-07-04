@@ -1,0 +1,15 @@
+---
+# tasks/cron.yml
+# Wire up the cron jobs Sendy needs to process its send queue.
+
+- name: "Cron | Manage Sendy cron jobs"
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    job: "{{ item.job }}"
+    user: "{{ sendy_install_cron_user }}"
+    state: present
+  loop: "{{ sendy_install_cron_jobs }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: sendy_install_manage_cron | bool

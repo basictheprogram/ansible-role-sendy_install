@@ -1,0 +1,94 @@
+---
+# defaults/main.yml
+# Public interface for the sendy_install role.
+# All variables can be overridden in host_vars, group_vars, or with -e.
+#
+# Required variables (no sensible default — must be set in host_vars):
+#   sendy_install_zip_src        — path to the Sendy zip on the Ansible control node
+#   sendy_install_url            — full public URL Sendy will be served from
+#   sendy_install_db_password    — password for the pre-provisioned Sendy database user
+#   sendy_install_encryption_key — 32-character random string, generated once and kept stable
+
+# ── Installation ──────────────────────────────────────────────────────────
+
+# Absolute path to the Sendy web root on the remote host. Must not already
+# contain an installed Sendy (this role installs, it does not upgrade —
+# see the sibling realtime.sendy role for upgrades).
+sendy_install_dir: /var/www/html/sendy
+
+# Temp directory on the remote host used to extract the new build before
+# it is moved into sendy_install_dir. Wiped at the start of every run.
+sendy_install_staging_dir: /tmp/sendy_install
+
+# System user and group that owns the installed files and runs the
+# web server / PHP process. This role does not install the web server,
+# PHP, or the database — provision those with their own roles first.
+sendy_install_web_user: www-data
+sendy_install_web_group: www-data
+
+# Default permissions for directories this role creates directly
+# (staging dir, install dir's parent). The extracted Sendy tree itself
+# keeps the symbolic u=rwX,g=rX,o=rX mode applied during extraction,
+# which differentiates files from directories automatically.
+sendy_install_dir_mode: "0755"
+
+# Subdirectories (relative to sendy_install_dir) that Sendy writes to at
+# runtime and therefore need group-writable permissions.
+sendy_install_writable_dirs:
+  - uploads
+
+sendy_install_writable_dir_mode: "0775"
+
+# ── Zip source ────────────────────────────────────────────────────────────
+
+# Full path to the Sendy zip ON the Ansible control node. Sendy is
+# commercial software with no public download URL — obtain the zip from
+# your Sendy account after purchase and stage it at this path.
+#
+#   sendy_install_zip_src: /mnt/synology_sendy/sendy.zip
+#
+sendy_install_zip_src: ""
+
+# ── Application configuration (includes/config.php) ───────────────────────
+
+# Public URL Sendy will be reached at, e.g. https://sendy.example.com
+sendy_install_url: ""
+
+# PHP timezone identifier written into config.php.
+sendy_install_timezone: "UTC"
+
+# 32-character random string used as Sendy's encryption key. Generate once
+# per installation and keep it stable — rotating it can break existing
+# subscriber data. Example: `openssl rand -hex 16`.
+sendy_install_encryption_key: ""
+
+# ── Database ───────────────────────────────────────────────────────────────
+#
+# This role assumes the database and Sendy's schema already exist
+# (provisioned separately, e.g. via geerlingguy.mysql plus a manual or
+# separately-automated schema import) — it only writes these connection
+# details into config.php and never creates a database, user, or table.
+
+sendy_install_db_host: 127.0.0.1
+sendy_install_db_port: 3306
+sendy_install_db_name: sendy
+sendy_install_db_username: sendy
+sendy_install_db_password: ""
+
+# ── Cron ───────────────────────────────────────────────────────────────────
+
+# Whether this role manages Sendy's cron jobs at all.
+sendy_install_manage_cron: true
+
+# System user the cron jobs run as.
+sendy_install_cron_user: "{{ sendy_install_web_user }}"
+
+# Cron jobs required to process Sendy's send queue. Each entry is passed
+# directly to ansible.builtin.cron. The default covers the one job every
+# Sendy install documents (the campaign send queue processor); add more
+# entries here if your Sendy version's documentation lists additional
+# cron scripts (e.g. an API-triggered blast processor).
+sendy_install_cron_jobs:
+  - name: "sendy_install: process send queue"
+    minute: "*/1"
+    job: "php {{ sendy_install_dir }}/cron/campaigns.php > /dev/null 2>&1"

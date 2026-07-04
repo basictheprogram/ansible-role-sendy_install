@@ -1,0 +1,32 @@
+---
+dependencies: []
+
+galaxy_info:
+  namespace: realtime
+  role_name: sendy_install
+  author: "Bob Tanner"
+  company: "Real Time Enterprises, Inc."
+  description: >-
+    Installs Sendy (a self-hosted email newsletter application) for the
+    first time on Debian (bookworm, trixie) or Ubuntu (jammy, noble,
+    resolute): extracts a purchased Sendy release zip staged on the
+    Ansible control node, writes includes/config.php, sets ownership and
+    permissions, and wires up the send-queue cron job. Does not install
+    the web server, PHP, or database, and does not create the database,
+    user, or schema — those must already be provisioned. Pairs with the
+    realtime.sendy role, which handles upgrading an existing install.
+  issue_tracker_url: https://github.com/basictheprogram/ansible-role-sendy_install/issues
+  license: "MIT"
+  min_ansible_version: "2.20"
+  galaxy_tags:
+    - sendy
+    - email
+    - newsletter
+    - emailmarketing
+    - webapp
+    - php
+    - mysql
+    - cron
+    - apache
+    - ubuntu
+    - debian

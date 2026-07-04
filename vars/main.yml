@@ -1,0 +1,8 @@
+---
+# vars/main.yml
+# first_found fallback for OS-specific overrides (see tasks/main.yml).
+# This role has no OS-varying package names or paths — Debian and Ubuntu
+# both use the same web user (www-data) and this role never installs
+# packages itself — so there is nothing to override yet. Left empty and
+# in place for consistency with other roles in this project; add
+# vars/<OsFamily>.yml alongside it if that ever changes.

@@ -1,0 +1,8 @@
+---
+# molecule/default/requirements.yml
+# Ansible collections required by the role and by converge.yml's fixture
+# build, resolved by molecule's own `dependency` step before it runs.
+
+collections:
+  - name: ansible.posix
+  - name: community.general

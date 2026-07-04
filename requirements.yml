@@ -1,0 +1,12 @@
+---
+# requirements.yml
+# Ansible collections used by this role's tasks (ansible.posix, for the
+# install-directory sync) and by molecule/default/converge.yml's own
+# pre_tasks (community.general, for building the test fixture zip).
+# ansible-lint runs `ansible-galaxy collection install -r requirements.yml`
+# automatically when this file is present at the role root, which resolves
+# syntax-check[unknown-module] for both.
+
+collections:
+  - name: ansible.posix
+  - name: community.general

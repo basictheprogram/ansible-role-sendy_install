@@ -1,0 +1,114 @@
+---
+# tasks/install.yml
+# Stage the purchased Sendy zip on the remote host, extract it, write
+# config.php, then sync the result into the live install directory.
+
+# ── Stage ──────────────────────────────────────────────────────────────────
+
+- name: "Install | Remove stale staging directory"
+  ansible.builtin.file:
+    path: "{{ sendy_install_staging_dir }}"
+    state: absent
+
+- name: "Install | Create staging directory"
+  ansible.builtin.file:
+    path: "{{ sendy_install_staging_dir }}"
+    state: directory
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "{{ sendy_install_dir_mode }}"
+
+- name: "Install | Upload Sendy zip from control node"
+  ansible.builtin.copy:
+    src: "{{ sendy_install_zip_src }}"
+    dest: "{{ sendy_install_staging_dir }}/sendy-install.zip"
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "0640"
+
+- name: "Install | Extract zip into staging directory"
+  ansible.builtin.unarchive:
+    src: "{{ sendy_install_staging_dir }}/sendy-install.zip"
+    dest: "{{ sendy_install_staging_dir }}"
+    remote_src: true
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "u=rwX,g=rX,o=rX"
+
+- name: "Install | Find extracted top-level directory"
+  ansible.builtin.find:
+    paths: "{{ sendy_install_staging_dir }}"
+    file_type: directory
+    depth: 1
+  register: _sendy_install_extracted_dirs
+
+- name: "Install | Fail if the zip did not extract to a single top-level directory"
+  ansible.builtin.fail:
+    msg: >
+      Expected the Sendy zip to extract to exactly one top-level directory
+      under {{ sendy_install_staging_dir }}, found
+      {{ _sendy_install_extracted_dirs.files | length }}. Verify
+      sendy_install_zip_src points at a genuine Sendy release zip.
+  when: _sendy_install_extracted_dirs.files | length != 1
+
+- name: "Install | Set build directory fact"
+  ansible.builtin.set_fact:
+    _sendy_install_build_dir: "{{ (_sendy_install_extracted_dirs.files | first).path }}"
+
+- name: "Install | Show extracted build path"
+  ansible.builtin.debug:
+    msg: "New install staged at: {{ _sendy_install_build_dir }}"
+
+# ── Configure ──────────────────────────────────────────────────────────────
+
+- name: "Install | Write includes/config.php"
+  ansible.builtin.template:
+    src: config.php.j2
+    dest: "{{ _sendy_install_build_dir }}/includes/config.php"
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "0640"
+  no_log: true
+
+# ── Sync into place ────────────────────────────────────────────────────────
+
+- name: "Install | Ensure the parent of the install directory exists"
+  ansible.builtin.file:
+    path: "{{ sendy_install_dir | dirname }}"
+    state: directory
+    mode: "{{ sendy_install_dir_mode }}"
+
+- name: "Install | Sync staged build into the install directory"
+  ansible.posix.synchronize:
+    src: "{{ _sendy_install_build_dir }}/"
+    dest: "{{ sendy_install_dir }}/"
+    recursive: true
+    rsync_opts:
+      - "--chown={{ sendy_install_web_user }}:{{ sendy_install_web_group }}"
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: "Install | Set group-writable permissions on runtime-writable directories"
+  ansible.builtin.file:
+    path: "{{ sendy_install_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "{{ sendy_install_writable_dir_mode }}"
+    recurse: true
+  loop: "{{ sendy_install_writable_dirs }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: "Install | Lock down config.php permissions"
+  ansible.builtin.file:
+    path: "{{ sendy_install_dir }}/includes/config.php"
+    owner: "{{ sendy_install_web_user }}"
+    group: "{{ sendy_install_web_group }}"
+    mode: "0640"
+
+# ── Clean up staging ──────────────────────────────────────────────────────
+
+- name: "Install | Remove staging directory"
+  ansible.builtin.file:
+    path: "{{ sendy_install_staging_dir }}"
+    state: absent

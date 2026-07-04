@@ -1,0 +1,103 @@
+---
+# molecule/default/converge.yml
+# Builds a self-contained fake Sendy release zip on localhost (the
+# "purchase" this role expects to find on the Ansible control node),
+# then runs the role against the managed hosts, pointed at that zip.
+
+# ── Control node ───────────────────────────────────────────────────────────
+- name: "Converge | Build fake Sendy release zip on control node"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    sendy_install_fixture_dir: /tmp/molecule-sendy-fixture
+    sendy_install_fixture_zip: /tmp/molecule-sendy-fixture.zip
+
+  tasks:
+    - name: "Fixture | Remove stale fixture directory and zip"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ sendy_install_fixture_dir }}"
+        - "{{ sendy_install_fixture_zip }}"
+
+    - name: "Fixture | Create fake Sendy release tree"
+      ansible.builtin.file:
+        path: "{{ sendy_install_fixture_dir }}/sendy/{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - includes
+        - cron
+        - uploads
+
+    - name: "Fixture | Write fake index.php"
+      ansible.builtin.copy:
+        content: |
+          <?php echo 'Sendy fixture for molecule testing'; ?>
+        dest: "{{ sendy_install_fixture_dir }}/sendy/index.php"
+        mode: "0644"
+
+    - name: "Fixture | Write fake cron/campaigns.php"
+      ansible.builtin.copy:
+        content: |
+          <?php echo 'fixture campaigns queue processor'; ?>
+        dest: "{{ sendy_install_fixture_dir }}/sendy/cron/campaigns.php"
+        mode: "0644"
+
+    - name: "Fixture | Write placeholder file in uploads dir"
+      ansible.builtin.copy:
+        content: "fixture placeholder\n"
+        dest: "{{ sendy_install_fixture_dir }}/sendy/uploads/.keep"
+        mode: "0644"
+
+    - name: "Fixture | Archive fixture tree into a single-top-level-directory zip"
+      community.general.archive:
+        path: "{{ sendy_install_fixture_dir }}/sendy"
+        dest: "{{ sendy_install_fixture_zip }}"
+        format: zip
+        mode: "0644"
+
+# ── Managed hosts ────────────────────────────────────────────────────────
+- name: "Converge"
+  hosts: all
+  gather_facts: true
+  become: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+        force_apt_get: true
+      changed_when: false
+      when: ansible_facts.os_family == 'Debian'
+    - name: Update dnf cache
+      ansible.builtin.dnf:
+        update_cache: true
+      changed_when: false
+      when: ansible_facts.os_family == 'RedHat'
+
+  vars:
+    sendy_install_zip_src: /tmp/molecule-sendy-fixture.zip
+    sendy_install_dir: /var/www/html/sendy
+    sendy_install_staging_dir: /tmp/sendy_install
+    sendy_install_web_user: www-data
+    sendy_install_web_group: www-data
+    sendy_install_url: https://sendy.example.com
+    sendy_install_timezone: America/Chicago
+    # Test-only value — never a real secret. Deliberately low-entropy
+    # (repeated pattern) so secret-scanners don't mistake it for a real
+    # key. 32 characters exactly, as sendy_install_encryption_key requires.
+    sendy_install_encryption_key: "TESTTESTTESTTESTTESTTESTTESTTEST"
+    sendy_install_db_host: 127.0.0.1
+    sendy_install_db_name: sendy_test
+    sendy_install_db_username: sendy_test
+    # Test-only value — never a real secret.
+    sendy_install_db_password: "molecule-test-password-not-real"
+    sendy_install_manage_cron: true
+
+  roles:
+    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}"

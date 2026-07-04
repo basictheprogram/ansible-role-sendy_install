@@ -1,0 +1,94 @@
+---
+# tasks/preflight.yml
+# Validate all preconditions before touching the target host.
+# Fail fast — before any files are extracted or written.
+
+- name: "Preflight | Assert supported ansible-core version"
+  ansible.builtin.assert:
+    that:
+      - ansible_version.full is version("2.20", ">=")
+    fail_msg: >
+      sendy_install requires ansible-core >= 2.20
+      (running {{ ansible_version.full }}).
+    quiet: true
+
+- name: "Preflight | Assert supported OS family"
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['distribution'] in ['Debian', 'Ubuntu']
+    fail_msg: >
+      sendy_install only supports Debian and Ubuntu
+      (target reports {{ ansible_facts['distribution'] }}).
+    quiet: true
+
+- name: "Preflight | Warn on OS release outside the tested support matrix"
+  ansible.builtin.debug:
+    msg: >
+      {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_release'] }}
+      is not one of this role's tested releases
+      (Debian bookworm/trixie, Ubuntu jammy/noble/resolute). Proceeding anyway —
+      this is a warning, not a failure.
+  when: ansible_facts['distribution_release'] not in ['bookworm', 'trixie', 'jammy', 'noble', 'resolute']
+
+- name: "Preflight | Assert required variables are set"
+  ansible.builtin.assert:
+    that:
+      - sendy_install_zip_src | length > 0
+      - sendy_install_url | length > 0
+      - sendy_install_db_password | length > 0
+      - sendy_install_encryption_key | length > 0
+    fail_msg: >
+      One or more required variables are empty. Set sendy_install_zip_src,
+      sendy_install_url, sendy_install_db_password, and
+      sendy_install_encryption_key in host_vars before running this role.
+    quiet: true
+
+- name: "Preflight | Assert encryption key is exactly 32 characters"
+  ansible.builtin.assert:
+    that:
+      - sendy_install_encryption_key | length == 32
+    fail_msg: >
+      sendy_install_encryption_key must be exactly 32 characters
+      (got {{ sendy_install_encryption_key | length }}). Generate one with:
+      openssl rand -hex 16
+    quiet: true
+    no_log: true
+
+- name: "Preflight | Check that the Sendy zip exists on the control node"
+  ansible.builtin.stat:
+    path: "{{ sendy_install_zip_src }}"
+  register: _sendy_install_zip_stat
+  delegate_to: localhost
+  become: false
+
+- name: "Preflight | Fail if zip is not present on control node"
+  ansible.builtin.fail:
+    msg: >
+      Sendy zip not found at {{ sendy_install_zip_src }} on the Ansible
+      control node. Stage the purchased Sendy zip at this path and set
+      sendy_install_zip_src accordingly.
+  when: not _sendy_install_zip_stat.stat.exists
+
+- name: "Preflight | Check whether Sendy is already installed"
+  ansible.builtin.stat:
+    path: "{{ sendy_install_dir }}/includes/config.php"
+  register: _sendy_install_config_stat
+
+- name: "Preflight | Fail if Sendy is already installed at the target directory"
+  ansible.builtin.fail:
+    msg: >
+      {{ sendy_install_dir }}/includes/config.php already exists — Sendy
+      appears to already be installed here. This role performs a first-time
+      install only; use the realtime.sendy role to upgrade an existing
+      install instead.
+  when: _sendy_install_config_stat.stat.exists
+
+- name: "Preflight | Display install target info"
+  ansible.builtin.debug:
+    msg:
+      - "Host        : {{ inventory_hostname }}"
+      - "Install dir : {{ sendy_install_dir }}"
+      - "Zip source  : {{ sendy_install_zip_src }}"
+      - "Staging dir : {{ sendy_install_staging_dir }}"
+      - "Install URL : {{ sendy_install_url }}"
+      - "Manage cron : {{ sendy_install_manage_cron }}"

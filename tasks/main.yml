@@ -1,0 +1,28 @@
+---
+# tasks/main.yml
+# Entry point — runs preflight, then OS-specific var loading, then install
+# and cron setup in order.
+
+- name: "Preflight checks"
+  ansible.builtin.import_tasks: preflight.yml
+  tags: [sendy_install, sendy_install_preflight]
+
+- name: "Load OS-specific variables"
+  ansible.builtin.include_vars:
+    file: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_facts['distribution'] }}.yml"
+        - "{{ ansible_facts['os_family'] }}.yml"
+        - main.yml
+      paths:
+        - vars
+  tags: [always]
+
+- name: "Install Sendy"
+  ansible.builtin.import_tasks: install.yml
+  tags: [sendy_install, sendy_install_install]
+
+- name: "Configure Sendy cron jobs"
+  ansible.builtin.import_tasks: cron.yml
+  tags: [sendy_install, sendy_install_cron]
