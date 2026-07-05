@@ -118,7 +118,7 @@ managed via `ansible-vault` in the inventory repo, not in this role.
 
 ### Commit scopes
 
-Role-specific subsystem scopes: `preflight`, `install`, `cron`, `config`.
+Role-specific subsystem scopes: `preflight`, `install`, `database`, `cron`, `config`.
 
 ### Settled decisions
 
@@ -255,7 +255,7 @@ Infer a scope from the role layout or the subsystem being changed.
 Common Ansible role scopes: `tasks`, `handlers`, `templates`,
 `defaults`, `vars`, `meta`, `molecule`, `docker`.
 
-Role-specific subsystem scopes: `preflight`, `install`, `cron`, `config`.
+Role-specific subsystem scopes: `preflight`, `install`, `database`, `cron`, `config`.
 
 Only include a scope when it adds clarity. Prefer a subsystem scope
 for feature-driven changes (e.g., `feat(cron): ...`) and a role-layout

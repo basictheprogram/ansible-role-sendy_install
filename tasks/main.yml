@@ -1,7 +1,7 @@
 ---
 # tasks/main.yml
-# Entry point — runs preflight, then OS-specific var loading, then install
-# and cron setup in order.
+# Entry point — runs preflight, then OS-specific var loading, then install,
+# database, and cron setup in order.
 
 - name: "Preflight checks"
   ansible.builtin.import_tasks: preflight.yml
@@ -22,6 +22,10 @@
 - name: "Install Sendy"
   ansible.builtin.import_tasks: install.yml
   tags: [sendy_install, sendy_install_install]
+
+- name: "Create Sendy database"
+  ansible.builtin.import_tasks: database.yml
+  tags: [sendy_install, sendy_install_database]
 
 - name: "Configure Sendy cron jobs"
   ansible.builtin.import_tasks: cron.yml

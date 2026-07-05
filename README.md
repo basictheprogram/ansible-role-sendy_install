@@ -6,8 +6,8 @@
 Ansible role that performs a **first-time install** of
 [Sendy](https://sendy.co), a self-hosted email newsletter application,
 on a Linux host. It extracts a purchased Sendy release zip, writes
-`includes/config.php`, sets ownership/permissions, and wires up the
-send-queue cron job.
+`includes/config.php`, sets ownership/permissions, creates the Sendy
+database/user/grants, and wires up the send-queue cron job.
 
 This role installs only — it does not upgrade an existing install. See
 the sibling [`realtime.sendy`](../ansible-role-sendy) role for upgrades.
@@ -17,21 +17,24 @@ before running this one):
 
 * The web server (Apache/nginx) and its vhost
 * PHP and its extensions
-* The MySQL/MariaDB server, database, user, and Sendy's schema —
-  this role only writes DB *connection details* into `config.php`; it
-  never creates a database, user, or table.
+* The MySQL/MariaDB *server* itself and Sendy's schema (tables) — this
+  role creates the database, user, and grants (see `tasks/database.yml`),
+  but the server must already be installed and running, and the schema
+  must still be imported separately.
 
 ---
 
 ## Requirements
 
 * Ansible core ≥ 2.20 (`pip install ansible`)
-* `ansible.posix` collection — `ansible-galaxy collection install ansible.posix`
-  (declared in `requirements.yml`; install with
+* `ansible.posix` and `ansible.mysql` collections (declared in
+  `requirements.yml`; install with
   `ansible-galaxy collection install -r requirements.yml`)
 * A purchased Sendy release zip staged on the Ansible control node
-* A web server, PHP, and MySQL/MariaDB already provisioned on the target,
-  with Sendy's database and schema already created
+* A web server, PHP, and a running MySQL/MariaDB server already
+  provisioned on the target — this role creates the database, user, and
+  grants itself, but Sendy's schema (tables) must still be imported
+  separately
 
 ### Supported platforms
 
@@ -62,7 +65,7 @@ Full descriptions and types are also documented in `meta/argument_specs.yml`.
 
 | Variable | Default | Description |
 |---|---|---|
-| `sendy_install_packages` | `[unzip, rsync, cron]` | Packages this role installs directly (its own tasks depend on them) |
+| `sendy_install_packages` | `[unzip, rsync, cron, python3-pymysql]` | Packages this role installs directly (its own tasks depend on them) |
 | `sendy_install_dir` | `/var/www/html/sendy` | Live Sendy web root on the remote host |
 | `sendy_install_staging_dir` | `/tmp/sendy_install` | Temp dir on remote for extraction |
 | `sendy_install_web_user` | `www-data` | Web server process user |
@@ -75,12 +78,13 @@ Full descriptions and types are also documented in `meta/argument_specs.yml`.
 | `sendy_install_force_reinstall` | `false` | Testing only. Bypasses the same-or-older-version guard; does not bypass the already-installed guard |
 | `sendy_install_url` | `""` | **Required.** Full public URL Sendy is served from, written into `config.php`'s `APP_PATH` |
 | `sendy_install_cookie_domain` | `""` | Domain written into `config.php`'s `COOKIE_DOMAIN` |
-| `sendy_install_db_host` | `127.0.0.1` | Pre-provisioned database host |
-| `sendy_install_db_port` | `3306` | Pre-provisioned database port |
-| `sendy_install_db_name` | `sendy` | Pre-provisioned database name |
-| `sendy_install_db_username` | `sendy` | Pre-provisioned database user |
-| `sendy_install_db_password` | `""` | **Required.** Pre-provisioned database password. Never logged |
-| `sendy_install_db_charset` | `utf8mb4` | MySQL character set `config.php` connects with |
+| `sendy_install_db_host` | `127.0.0.1` | Database host; also the host the created database user is granted access from |
+| `sendy_install_db_port` | `3306` | Database port |
+| `sendy_install_db_name` | `sendy` | Name of the database this role creates |
+| `sendy_install_db_username` | `sendy` | Username of the database user this role creates |
+| `sendy_install_db_password` | `""` | **Required.** Password this role sets for the created database user. Never logged |
+| `sendy_install_db_charset` | `utf8mb4` | MySQL character set `config.php` connects with, and the created database uses |
+| `sendy_install_db_socket` | `/run/mysqld/mysqld.sock` | Unix socket used to connect as local root when creating the database/user |
 | `sendy_install_manage_cron` | `true` | Whether this role manages Sendy's cron jobs |
 | `sendy_install_cron_user` | `{{ sendy_install_web_user }}` | User the cron jobs run as |
 | `sendy_install_cron_jobs` | see `defaults/main.yml` | Cron job entries passed to `ansible.builtin.cron` |
@@ -103,14 +107,18 @@ the same web user and the same package names for `sendy_install_packages`.
    against `vars/` (currently a no-op; see above).
 3. **Install** (`tasks/install.yml`) — uploads the zip to a staging
    directory, updates the apt cache and installs `sendy_install_packages`
-   (`unzip`, `rsync`, and `cron` by default — required by
-   `ansible.builtin.unarchive`, `ansible.posix.synchronize`, and
-   `ansible.builtin.cron` respectively), extracts the zip, writes
-   `includes/config.php`, syncs the result into `sendy_install_dir`,
-   sets permissions on writable directories and `config.php`, removes
-   the staging directory, then records the installed version at
-   `sendy_install_version_marker`.
-4. **Cron** (`tasks/cron.yml`) — creates the send-queue cron job(s).
+   (`unzip`, `rsync`, `cron`, and `python3-pymysql` by default — required
+   by `ansible.builtin.unarchive`, `ansible.posix.synchronize`,
+   `ansible.builtin.cron`, and `ansible.mysql`'s modules respectively),
+   extracts the zip, writes `includes/config.php`, syncs the result into
+   `sendy_install_dir`, sets permissions on writable directories and
+   `config.php`, removes the staging directory, then records the
+   installed version at `sendy_install_version_marker`.
+4. **Database** (`tasks/database.yml`) — creates the Sendy database,
+   user, and grants, authenticating as local root over the unix socket.
+   Requires a MySQL/MariaDB server already running on the target; does
+   not import Sendy's schema (tables).
+5. **Cron** (`tasks/cron.yml`) — creates the send-queue cron job(s).
 
 ---
 
@@ -145,6 +153,9 @@ ansible-playbook install_sendy.yml --tags sendy_install_preflight
 
 # Install only (skips preflight — use with caution)
 ansible-playbook install_sendy.yml --tags sendy_install_install
+
+# Database only (skips preflight — use with caution)
+ansible-playbook install_sendy.yml --tags sendy_install_database
 
 # Cron only
 ansible-playbook install_sendy.yml --tags sendy_install_cron

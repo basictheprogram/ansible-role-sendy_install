@@ -20,10 +20,15 @@ first scaffolded (2026-07-03):
 * **Sendy source** = a zip staged on the Ansible control node
   (`sendy_install_zip_src`), matching the sibling `realtime.sendy` role's
   pattern. Sendy is commercial software with no public download URL.
-* **Database** = assumed fully pre-provisioned. This role only writes
-  connection details into `config.php`; it never creates a database,
-  user, or imports Sendy's schema. Something else in the deployment
-  pipeline must do that before this role runs.
+* **Database** = the MySQL/MariaDB *server* is assumed pre-provisioned
+  and already running on the target. This role creates the Sendy
+  database, user, and grants (added 2026-07-04, confirmed with Bob
+  Tanner) using `ansible.mysql`, authenticating as the local root user
+  over the unix socket (`sendy_install_db_socket`, the standard
+  Debian/Ubuntu `auth_socket`/`unix_socket` default) — no admin password
+  variable is needed. Something else in the deployment pipeline must
+  still install/start the database server and import Sendy's schema
+  (tables); this role does not do either of those.
 * **Web server** = Apache only, no `sendy_install_webserver_service`
   variable. This role never restarts or configures the web server
   itself — there's currently nothing in this role's own tasks that
@@ -54,22 +59,25 @@ first scaffolded (2026-07-03):
   would mean this role can reinstall over an existing Sendy, which
   contradicts install-only Scope above. Defaults to `false`.
 * **This role installs its own direct dependencies via
-  `sendy_install_packages`** (`unzip`, `rsync`, `cron` by default; `cron`
-  added 2026-07-04, after a real run failed with `crontab` missing).
-  `ansible.builtin.unarchive` requires the system `unzip` binary for
-  `.zip` files — it does not fall back to Python's `zipfile` module in
-  practice — `ansible.posix.synchronize` requires `rsync` on both ends,
-  and `ansible.builtin.cron` (used by `tasks/cron.yml`) requires the
-  `crontab` executable, which ships in the `cron` package rather than
-  the base OS install. This is a narrow exception to "no OS
-  patching/package installation" in Scope above: these are direct,
-  load-bearing dependencies of this role's own tasks, not general system
-  package management, so `tasks/install.yml` updates the apt cache and
-  installs `sendy_install_packages` before extracting. Same package
-  names on both Debian and Ubuntu, so no `vars/<OsFamily>.yml` split is
-  needed. The molecule test images already ship all three packages
-  preinstalled, which is why this gap wasn't caught until a real host
-  run.
+  `sendy_install_packages`** (`unzip`, `rsync`, `cron`, `python3-pymysql`
+  by default; `cron` added 2026-07-04 after a real run failed with
+  `crontab` missing; `python3-pymysql` added 2026-07-04 alongside the
+  database task below, since `ansible.mysql`'s modules require a
+  Python MySQL library on the target). `ansible.builtin.unarchive`
+  requires the system `unzip` binary for `.zip` files — it does not fall
+  back to Python's `zipfile` module in practice — `ansible.posix.synchronize`
+  requires `rsync` on both ends, `ansible.builtin.cron` (used by
+  `tasks/cron.yml`) requires the `crontab` executable, which ships in the
+  `cron` package rather than the base OS install, and `ansible.mysql.mysql_db`/
+  `mysql_user` (used by `tasks/database.yml`) require PyMySQL. This is a
+  narrow exception to "no OS patching/package installation" in Scope
+  above: these are direct, load-bearing dependencies of this role's own
+  tasks, not general system package management, so `tasks/install.yml`
+  updates the apt cache and installs `sendy_install_packages` before
+  extracting. Same package names on both Debian and Ubuntu, so no
+  `vars/<OsFamily>.yml` split is needed. The molecule test images already
+  ship `unzip`/`rsync`/`cron` preinstalled, which is why that gap wasn't
+  caught until a real host run.
 * **Molecule `idempotence` step dropped.** This role deliberately fails
   on a second run (both the config.php-exists check and, now, the
   version guard would trigger) — it is not meant to be idempotent in
@@ -113,6 +121,12 @@ If a task touches one of these, leave a `# TODO(open-q):` comment:
   testing proves unreliable for it, consider dropping it from the matrix
   rather than fighting image availability — ask before doing so, per the
   usual platform-removal rule.
+* **`sendy_install_db_socket`'s default path is an assumption, not
+  verified against a real host.** `/run/mysqld/mysqld.sock` is the
+  standard Debian/Ubuntu MySQL and MariaDB package default, but if a
+  target's server is configured with a different socket path, override
+  the variable in host_vars — `tasks/database.yml`'s connection will
+  otherwise fail.
 * **The `sendy-X.Y.Z.zip` filename pattern is inferred from one example**
   (`sendy-7.0.6.zip`), not verified across multiple HelloSendy releases
   or download methods. If a future release ever ships under a different

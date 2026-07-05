@@ -3,25 +3,27 @@ argument_specs:
   main:
     short_description: >-
       First-time install of Sendy on Debian/Ubuntu, against a
-      pre-provisioned web server, PHP, and database.
+      pre-provisioned web server, PHP, and database server.
     description: >-
       Extracts a purchased Sendy release zip staged on the Ansible
       control node, writes includes/config.php, sets ownership and
-      permissions, and wires up the send-queue cron job. Does not
-      install the web server, PHP, or database, and does not create the
-      database, user, or schema — those must already exist. This role
-      installs only; use the sibling realtime.sendy role to upgrade an
-      existing install.
+      permissions, creates the Sendy database/user/grants, and wires up
+      the send-queue cron job. Does not install the web server, PHP, or
+      the MySQL/MariaDB server itself, and does not import Sendy's
+      schema (tables) — those must already exist. This role installs
+      only; use the sibling realtime.sendy role to upgrade an existing
+      install.
     options:
       sendy_install_packages:
         type: list
         elements: str
-        default: [unzip, rsync, cron]
+        default: [unzip, rsync, cron, python3-pymysql]
         description: >-
           Packages this role installs directly because its own tasks
           depend on them (unzip for ansible.builtin.unarchive, rsync for
           ansible.posix.synchronize, cron for ansible.builtin.cron's
-          crontab binary) -- not general OS package management.
+          crontab binary, python3-pymysql for ansible.mysql.mysql_db
+          and mysql_user) -- not general OS package management.
       sendy_install_dir:
         type: str
         default: /var/www/html/sendy
@@ -102,29 +104,41 @@ argument_specs:
       sendy_install_db_host:
         type: str
         default: 127.0.0.1
-        description: Hostname of the pre-provisioned Sendy database.
+        description: >-
+          Hostname of the Sendy database, and the host the created
+          database user is granted access from.
       sendy_install_db_port:
         type: int
         default: 3306
-        description: Port of the pre-provisioned Sendy database.
+        description: Port of the Sendy database.
       sendy_install_db_name:
         type: str
         default: sendy
-        description: Name of the pre-provisioned Sendy database.
+        description: Name of the Sendy database this role creates.
       sendy_install_db_username:
         type: str
         default: sendy
-        description: Username for the pre-provisioned Sendy database.
+        description: Username of the Sendy database user this role creates.
       sendy_install_db_password:
         type: str
         default: ""
         description: >-
-          Required. Password for the pre-provisioned Sendy database
-          user. Enforced non-empty by preflight. Never logged.
+          Required. Password this role sets for the Sendy database user
+          it creates. Enforced non-empty by preflight. Never logged.
       sendy_install_db_charset:
         type: str
         default: utf8mb4
-        description: MySQL character set config.php connects with.
+        description: >-
+          MySQL character set config.php connects with, and that the
+          created database uses.
+      sendy_install_db_socket:
+        type: str
+        default: /run/mysqld/mysqld.sock
+        description: >-
+          Unix socket path used to connect as the local root user when
+          creating the database/user. Standard Debian/Ubuntu
+          MySQL/MariaDB default -- override if the target's server uses
+          a different path.
       sendy_install_manage_cron:
         type: bool
         default: true

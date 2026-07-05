@@ -79,6 +79,19 @@
         update_cache: true
       changed_when: false
       when: ansible_facts.os_family == 'RedHat'
+    # Simulates the "server already provisioned" assumption tasks/database.yml
+    # relies on -- this role installs neither the package nor the service.
+    - name: "Fixture | Install MariaDB server"
+      ansible.builtin.apt:
+        name: mariadb-server
+        state: present
+      when: ansible_facts.os_family == 'Debian'
+    - name: "Fixture | Ensure MariaDB is running"
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+        enabled: true
+      when: ansible_facts.os_family == 'Debian'
 
   vars:
     sendy_install_zip_src: /tmp/sendy-9.9.9.zip

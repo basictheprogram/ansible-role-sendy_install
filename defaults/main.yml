@@ -6,19 +6,21 @@
 # Required variables (no sensible default — must be set in host_vars):
 #   sendy_install_zip_src        — path to the Sendy zip on the Ansible control node
 #   sendy_install_url            — full public URL Sendy will be served from
-#   sendy_install_db_password    — password for the pre-provisioned Sendy database user
+#   sendy_install_db_password    — password this role sets for the Sendy database user it creates
 
 # ── Installation ──────────────────────────────────────────────────────────
 
 # Packages this role installs directly because its own tasks depend on
 # them (unzip for ansible.builtin.unarchive, rsync for
 # ansible.posix.synchronize, cron for ansible.builtin.cron's crontab
-# binary) — not general OS package management. Same names on Debian and
-# Ubuntu, so no vars/<OsFamily>.yml split is needed.
+# binary, python3-pymysql for ansible.mysql.mysql_db/mysql_user) — not
+# general OS package management. Same names on Debian and Ubuntu, so no
+# vars/<OsFamily>.yml split is needed.
 sendy_install_packages:
   - unzip
   - rsync
   - cron
+  - python3-pymysql
 
 # Absolute path to the Sendy web root on the remote host. Must not already
 # contain an installed Sendy (this role installs, it does not upgrade —
@@ -85,10 +87,11 @@ sendy_install_cookie_domain: ""
 
 # ── Database ───────────────────────────────────────────────────────────────
 #
-# This role assumes the database and Sendy's schema already exist
-# (provisioned separately, e.g. via geerlingguy.mysql plus a manual or
-# separately-automated schema import) — it only writes these connection
-# details into config.php and never creates a database, user, or table.
+# This role assumes the MySQL/MariaDB server itself is already
+# provisioned and running (e.g. via geerlingguy.mysql) and creates the
+# Sendy database, user, and grants on it — see tasks/database.yml.
+# Sendy's schema (tables) is still imported separately; this role never
+# touches it.
 
 sendy_install_db_host: 127.0.0.1
 sendy_install_db_port: 3306
@@ -96,8 +99,15 @@ sendy_install_db_name: sendy
 sendy_install_db_username: sendy
 sendy_install_db_password: ""
 
-# MySQL character set config.php connects with.
+# MySQL character set config.php connects with, and that tasks/database.yml
+# creates the database with.
 sendy_install_db_charset: utf8mb4
+
+# Unix socket path used to connect as the local root user when creating
+# the database/user (tasks/database.yml) — the standard Debian/Ubuntu
+# MySQL/MariaDB default. Override if the target's server uses a
+# different socket path. See DESIGN.md's open questions.
+sendy_install_db_socket: /run/mysqld/mysqld.sock
 
 # ── Cron ───────────────────────────────────────────────────────────────────
 

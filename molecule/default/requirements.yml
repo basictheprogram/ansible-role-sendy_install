@@ -6,3 +6,5 @@
 collections:
   - name: ansible.posix
   - name: community.general
+  - name: ansible.mysql
+    version: ">=5.0.0"

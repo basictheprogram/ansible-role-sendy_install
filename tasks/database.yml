@@ -1,0 +1,31 @@
+---
+# tasks/database.yml
+# Create the Sendy database, user, and grants on the MySQL/MariaDB server
+# already running on the target. Authenticates as the local root user over
+# the unix socket (the standard Debian/Ubuntu auth_socket/unix_socket
+# default) — no admin password variable required. Sendy's own schema
+# (tables) is still imported separately; this role only provisions the
+# database, user, and privileges it needs.
+#
+# Uses ansible.mysql (not community.mysql, which is deprecated as of its
+# 4.2.1 release — all content, including mysql_db/mysql_user, moved as-is
+# to ansible.mysql; see requirements.yml).
+
+- name: "Database | Create Sendy database"
+  ansible.mysql.mysql_db:
+    name: "{{ sendy_install_db_name }}"
+    encoding: "{{ sendy_install_db_charset }}"
+    state: present
+    login_user: root
+    login_unix_socket: "{{ sendy_install_db_socket }}"
+
+- name: "Database | Create Sendy database user and grant privileges"
+  ansible.mysql.mysql_user:
+    name: "{{ sendy_install_db_username }}"
+    password: "{{ sendy_install_db_password }}"
+    host: "{{ sendy_install_db_host }}"
+    priv: "{{ sendy_install_db_name }}.*:ALL"
+    state: present
+    login_user: root
+    login_unix_socket: "{{ sendy_install_db_socket }}"
+  no_log: true

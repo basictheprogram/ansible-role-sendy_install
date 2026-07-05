@@ -16,7 +16,7 @@ WEB_GROUP: str = "www-data"
 
 # Packages this role installs directly (both Debian and Ubuntu use the
 # same package name).
-PACKAGES: list[str] = ["unzip", "rsync", "cron"]
+PACKAGES: list[str] = ["unzip", "rsync", "cron", "python3-pymysql"]
 
 # Files that must exist under INSTALL_DIR after a successful install.
 EXPECTED_FILES: list[str] = [
@@ -34,6 +34,8 @@ APP_PATH: str = "https://sendy.example.com"
 DB_HOST: str = "127.0.0.1"
 DB_NAME: str = "sendy_test"
 DB_USERNAME: str = "sendy_test"
+# Test-only value -- never a real secret. Matches converge.yml.
+DB_PASSWORD: str = "molecule-test-password-not-real"  # noqa: S105
 # Not overridden in converge.yml -- role defaults apply.
 DB_CHARSET: str = "utf8mb4"
 COOKIE_DOMAIN: str = ""

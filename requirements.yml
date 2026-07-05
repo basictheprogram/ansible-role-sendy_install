@@ -1,12 +1,16 @@
 ---
 # requirements.yml
 # Ansible collections used by this role's tasks (ansible.posix, for the
-# install-directory sync) and by molecule/default/converge.yml's own
-# pre_tasks (community.general, for building the test fixture zip).
+# install-directory sync; ansible.mysql, for tasks/database.yml -- not
+# community.mysql, which is deprecated as of its 4.2.1 release in favor of
+# ansible.mysql, same module names) and by molecule/default/converge.yml's
+# own pre_tasks (community.general, for building the test fixture zip).
 # ansible-lint runs `ansible-galaxy collection install -r requirements.yml`
 # automatically when this file is present at the role root, which resolves
-# syntax-check[unknown-module] for both.
+# syntax-check[unknown-module] for all three.
 
 collections:
   - name: ansible.posix
   - name: community.general
+  - name: ansible.mysql
+    version: ">=5.0.0"
