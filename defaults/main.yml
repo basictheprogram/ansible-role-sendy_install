@@ -4,9 +4,11 @@
 # All variables can be overridden in host_vars, group_vars, or with -e.
 #
 # Required variables (no sensible default — must be set in host_vars):
-#   sendy_install_zip_src        — path to the Sendy zip on the Ansible control node
-#   sendy_install_url            — full public URL Sendy will be served from
-#   sendy_install_db_password    — password this role sets for the Sendy database user it creates
+#   sendy_install_zip_src           — path to the Sendy zip on the Ansible control node
+#   sendy_install_url               — full public URL Sendy will be served from
+#   sendy_install_db_password       — password this role sets for the Sendy database user it creates
+#   sendy_install_db_admin_user     — privileged account used to create the database/user/grants
+#   sendy_install_db_admin_password — password for sendy_install_db_admin_user
 
 # ── Installation ──────────────────────────────────────────────────────────
 
@@ -88,10 +90,10 @@ sendy_install_cookie_domain: ""
 # ── Database ───────────────────────────────────────────────────────────────
 #
 # This role assumes the MySQL/MariaDB server itself is already
-# provisioned and running (e.g. via geerlingguy.mysql) and creates the
-# Sendy database, user, and grants on it — see tasks/database.yml.
-# Sendy's schema (tables) is still imported separately; this role never
-# touches it.
+# provisioned and running (e.g. RDS, or a self-managed server via
+# geerlingguy.mysql) and creates the Sendy database, user, and grants on
+# it over TCP — see tasks/database.yml. Sendy's schema (tables) is still
+# imported separately; this role never touches it.
 
 sendy_install_db_host: 127.0.0.1
 sendy_install_db_port: 3306
@@ -99,15 +101,41 @@ sendy_install_db_name: sendy
 sendy_install_db_username: sendy
 sendy_install_db_password: ""
 
+# Host pattern the created Sendy database user is granted access from
+# (the 'user'@'<this>' in CREATE USER/GRANT). Defaults to
+# sendy_install_db_host for backward compatibility, which is correct
+# when the database is reachable at a real, stable address that also
+# matches how the connecting client (Sendy's PHP process) appears to
+# the server. Override this separately when it isn't -- e.g. a
+# containerized database reached via a published port, where
+# sendy_install_db_host is the address to connect *to* but the
+# connecting client's apparent source address (what the server actually
+# matches grants against) is different, often the wildcard '%'.
+sendy_install_db_grant_host: "{{ sendy_install_db_host }}"
+
 # MySQL character set config.php connects with, and that tasks/database.yml
 # creates the database with.
 sendy_install_db_charset: utf8mb4
 
-# Unix socket path used to connect as the local root user when creating
-# the database/user (tasks/database.yml) — the standard Debian/Ubuntu
-# MySQL/MariaDB default. Override if the target's server uses a
-# different socket path. See DESIGN.md's open questions.
-sendy_install_db_socket: /run/mysqld/mysqld.sock
+# Authentication plugin tasks/database.yml assigns to the Sendy database
+# user it creates. Set explicitly (rather than left to the server's own
+# default_authentication_plugin/authentication_policy) because that
+# server-side default varies across RDS parameter groups and MySQL
+# versions -- some still resolve to mysql_native_password, which is
+# deprecated since MySQL 8.0.34 and disabled by default from 8.4 onward,
+# causing CREATE USER to fail with error 1524 ("Plugin
+# 'mysql_native_password' is not loaded"). caching_sha2_password is the
+# current MySQL default and is supported by python3-pymysql (already a
+# sendy_install_packages dependency).
+sendy_install_db_auth_plugin: caching_sha2_password
+
+# Privileged account tasks/database.yml authenticates as (over TCP, to
+# sendy_install_db_host:sendy_install_db_port) to create the Sendy
+# database, user, and grants — e.g. an RDS instance's master user. This
+# role never connects as the target server's own root/admin account
+# implicitly; you must provide credentials for one explicitly.
+sendy_install_db_admin_user: ""
+sendy_install_db_admin_password: ""
 
 # ── Cron ───────────────────────────────────────────────────────────────────
 

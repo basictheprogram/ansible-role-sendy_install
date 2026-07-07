@@ -84,7 +84,8 @@ Full descriptions and types are also documented in `meta/argument_specs.yml`.
 | `sendy_install_db_username` | `sendy` | Username of the database user this role creates |
 | `sendy_install_db_password` | `""` | **Required.** Password this role sets for the created database user. Never logged |
 | `sendy_install_db_charset` | `utf8mb4` | MySQL character set `config.php` connects with, and the created database uses |
-| `sendy_install_db_socket` | `/run/mysqld/mysqld.sock` | Unix socket used to connect as local root when creating the database/user |
+| `sendy_install_db_admin_user` | `""` | **Required.** Privileged account this role authenticates as over TCP to create the database/user/grants — e.g. an RDS instance's master user |
+| `sendy_install_db_admin_password` | `""` | **Required.** Password for `sendy_install_db_admin_user`. Never logged |
 | `sendy_install_manage_cron` | `true` | Whether this role manages Sendy's cron jobs |
 | `sendy_install_cron_user` | `{{ sendy_install_web_user }}` | User the cron jobs run as |
 | `sendy_install_cron_jobs` | see `defaults/main.yml` | Cron job entries passed to `ansible.builtin.cron` |
@@ -115,9 +116,10 @@ the same web user and the same package names for `sendy_install_packages`.
    `config.php`, removes the staging directory, then records the
    installed version at `sendy_install_version_marker`.
 4. **Database** (`tasks/database.yml`) — creates the Sendy database,
-   user, and grants, authenticating as local root over the unix socket.
-   Requires a MySQL/MariaDB server already running on the target; does
-   not import Sendy's schema (tables).
+   user, and grants, authenticating over TCP as `sendy_install_db_admin_user`
+   (e.g. an RDS instance's master user). Requires a MySQL/MariaDB server
+   already running on the target and reachable over TCP; does not import
+   Sendy's schema (tables).
 5. **Cron** (`tasks/cron.yml`) — creates the send-queue cron job(s).
 
 ---
@@ -130,6 +132,8 @@ Set the required host-specific variables in `host_vars/<hostname>.yml`:
 sendy_install_zip_src: /mnt/sendy_releases/sendy.zip
 sendy_install_url: https://sendy.example.com
 sendy_install_db_password: "{{ vault_sendy_db_password }}"
+sendy_install_db_admin_user: admin
+sendy_install_db_admin_password: "{{ vault_sendy_db_admin_password }}"
 ```
 
 Then run:

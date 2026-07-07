@@ -1,31 +1,63 @@
 ---
 # tasks/database.yml
 # Create the Sendy database, user, and grants on the MySQL/MariaDB server
-# already running on the target. Authenticates as the local root user over
-# the unix socket (the standard Debian/Ubuntu auth_socket/unix_socket
-# default) — no admin password variable required. Sendy's own schema
-# (tables) is still imported separately; this role only provisions the
-# database, user, and privileges it needs.
+# already running on the target. Authenticates over TCP as
+# sendy_install_db_admin_user (e.g. an RDS instance's master user) —
+# production MySQL (RDS) is only reachable over TCP, not a local unix
+# socket. Sendy's own schema (tables) is still imported separately; this
+# role only provisions the database, user, and privileges it needs.
 #
 # Uses ansible.mysql (not community.mysql, which is deprecated as of its
 # 4.2.1 release — all content, including mysql_db/mysql_user, moved as-is
 # to ansible.mysql; see requirements.yml).
+#
+# TODO(open-q): no TLS/SSL support yet. Add ca_cert/SSL-mode variables if
+# a target RDS instance enforces rds.force_ssl or similar — see
+# DESIGN.md's open questions.
+#
+# The Sendy user's auth plugin is set explicitly via
+# sendy_install_db_auth_plugin rather than left to the server's default,
+# since some RDS parameter groups still resolve to the deprecated (and,
+# from MySQL 8.4+, unloaded-by-default) mysql_native_password plugin,
+# which fails CREATE USER with error 1524. See DESIGN.md.
+#
+# The password is passed as plugin_auth_string, NOT password, and
+# deliberately not encrypted -- ansible.mysql.mysql_user's user_add()/
+# user_mod() hardcode CREATE/ALTER USER ... IDENTIFIED WITH
+# mysql_native_password whenever password is set (encrypted or not),
+# regardless of plugin. plugin only drives the statement when password
+# is unset and plugin_auth_string is used instead. Confirmed against
+# the installed ansible.mysql module_utils/user.py.
+#
+# The created user's grant host (sendy_install_db_grant_host) is
+# deliberately a separate variable from the connection target
+# (sendy_install_db_host, also used for config.php's $dbHost) -- see
+# DESIGN.md. They coincide for a same-host/socket-adjacent database but
+# diverge for a containerized one reached via a published port, where
+# the connecting client's apparent source address isn't
+# sendy_install_db_host.
 
 - name: "Database | Create Sendy database"
   ansible.mysql.mysql_db:
     name: "{{ sendy_install_db_name }}"
     encoding: "{{ sendy_install_db_charset }}"
     state: present
-    login_user: root
-    login_unix_socket: "{{ sendy_install_db_socket }}"
+    login_host: "{{ sendy_install_db_host }}"
+    login_port: "{{ sendy_install_db_port }}"
+    login_user: "{{ sendy_install_db_admin_user }}"
+    login_password: "{{ sendy_install_db_admin_password }}"
+  no_log: true
 
 - name: "Database | Create Sendy database user and grant privileges"
   ansible.mysql.mysql_user:
     name: "{{ sendy_install_db_username }}"
-    password: "{{ sendy_install_db_password }}"
-    host: "{{ sendy_install_db_host }}"
+    plugin: "{{ sendy_install_db_auth_plugin }}"
+    plugin_auth_string: "{{ sendy_install_db_password }}"
+    host: "{{ sendy_install_db_grant_host }}"
     priv: "{{ sendy_install_db_name }}.*:ALL"
     state: present
-    login_user: root
-    login_unix_socket: "{{ sendy_install_db_socket }}"
+    login_host: "{{ sendy_install_db_host }}"
+    login_port: "{{ sendy_install_db_port }}"
+    login_user: "{{ sendy_install_db_admin_user }}"
+    login_password: "{{ sendy_install_db_admin_password }}"
   no_log: true

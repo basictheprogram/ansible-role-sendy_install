@@ -105,8 +105,21 @@ argument_specs:
         type: str
         default: 127.0.0.1
         description: >-
-          Hostname of the Sendy database, and the host the created
-          database user is granted access from.
+          Hostname of the Sendy database, written into config.php's
+          $dbHost. See sendy_install_db_grant_host for the separate
+          host pattern the created database user is granted access
+          from.
+      sendy_install_db_grant_host:
+        type: str
+        default: "{{ sendy_install_db_host }}"
+        description: >-
+          Host pattern ('user'@'<this>') the created Sendy database
+          user is granted access from. Defaults to sendy_install_db_host
+          for backward compatibility; override separately when the
+          database is reached at a different address than the
+          connecting client's apparent source address -- e.g. a
+          containerized database behind a published port, where the
+          real client source is often not sendy_install_db_host itself.
       sendy_install_db_port:
         type: int
         default: 3306
@@ -131,14 +144,30 @@ argument_specs:
         description: >-
           MySQL character set config.php connects with, and that the
           created database uses.
-      sendy_install_db_socket:
+      sendy_install_db_auth_plugin:
         type: str
-        default: /run/mysqld/mysqld.sock
+        default: caching_sha2_password
         description: >-
-          Unix socket path used to connect as the local root user when
-          creating the database/user. Standard Debian/Ubuntu
-          MySQL/MariaDB default -- override if the target's server uses
-          a different path.
+          Authentication plugin assigned to the created Sendy database
+          user, applied via plugin_auth_string rather than password
+          (see tasks/database.yml). Set explicitly rather than left to
+          the server's default, since some servers still resolve to the
+          deprecated mysql_native_password plugin, which MySQL 8.4+
+          disables by default and fails CREATE USER with error 1524.
+      sendy_install_db_admin_user:
+        type: str
+        default: ""
+        description: >-
+          Required. Privileged account this role authenticates as, over
+          TCP to sendy_install_db_host:sendy_install_db_port, to create
+          the Sendy database, user, and grants -- e.g. an RDS instance's
+          master user. Enforced non-empty by preflight.
+      sendy_install_db_admin_password:
+        type: str
+        default: ""
+        description: >-
+          Required. Password for sendy_install_db_admin_user. Enforced
+          non-empty by preflight. Never logged.
       sendy_install_manage_cron:
         type: bool
         default: true

@@ -107,14 +107,21 @@ incomplete cron script list).
 
 ### Secrets
 
-Role-specific secret variable name:
+Role-specific secret variable names:
 
 * `sendy_install_db_password`
+* `sendy_install_db_admin_password` — privileged account
+  `tasks/database.yml` authenticates as, over TCP, to create the
+  database/user/grants (e.g. an RDS instance's master user; added
+  2026-07-06 when the database connection moved from a local unix
+  socket to TCP)
 
-Enforced non-empty by `tasks/preflight.yml` and never appears in
+Both are enforced non-empty by `tasks/preflight.yml` and never appear in
 `ansible.builtin.debug` output. The task that templates `config.php`
-(which embeds it) is marked `no_log: true`. Production values are
-managed via `ansible-vault` in the inventory repo, not in this role.
+(which embeds `sendy_install_db_password`) and both tasks in
+`tasks/database.yml` (which embed `sendy_install_db_admin_password`) are
+marked `no_log: true`. Production values are managed via `ansible-vault`
+in the inventory repo, not in this role.
 
 ### Commit scopes
 

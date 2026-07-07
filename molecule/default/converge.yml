@@ -83,7 +83,7 @@
     # relies on -- this role installs neither the package nor the service.
     - name: "Fixture | Install MariaDB server"
       ansible.builtin.apt:
-        name: mariadb-server
+        name: [mariadb-server, python3-pymysql]
         state: present
       when: ansible_facts.os_family == 'Debian'
     - name: "Fixture | Ensure MariaDB is running"
@@ -91,6 +91,22 @@
         name: mariadb
         state: started
         enabled: true
+      when: ansible_facts.os_family == 'Debian'
+    # tasks/database.yml now authenticates over TCP as an admin account
+    # (simulating an RDS master user) instead of local root over a unix
+    # socket -- bootstrap that account here, over the socket, since this
+    # fixture controls the server and a real RDS instance's master user
+    # would already exist by the time this role runs.
+    - name: "Fixture | Create TCP-reachable admin MySQL user"
+      ansible.mysql.mysql_user:
+        name: sendy_test_admin
+        # Test-only value — never a real secret.
+        password: "molecule-test-admin-password-not-real"
+        host: "%"
+        priv: "*.*:ALL,GRANT"
+        state: present
+        login_user: root
+        login_unix_socket: /run/mysqld/mysqld.sock
       when: ansible_facts.os_family == 'Debian'
 
   vars:
@@ -103,8 +119,16 @@
     sendy_install_db_host: 127.0.0.1
     sendy_install_db_name: sendy_test
     sendy_install_db_username: sendy_test
-    # Test-only value — never a real secret.
+    # The role's default (caching_sha2_password) matches modern MySQL/RDS,
+    # but this fixture runs MariaDB, which only loads mysql_native_password
+    # by default (caching_sha2_password requires INSTALL SONAME first, and
+    # is only bundled at all from MariaDB 12.1+) -- override to match what
+    # this test target actually supports.
+    sendy_install_db_auth_plugin: mysql_native_password
+    # Test-only values — never real secrets.
     sendy_install_db_password: "molecule-test-password-not-real"
+    sendy_install_db_admin_user: sendy_test_admin
+    sendy_install_db_admin_password: "molecule-test-admin-password-not-real"
     sendy_install_manage_cron: true
 
   roles:

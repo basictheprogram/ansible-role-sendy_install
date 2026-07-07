@@ -36,10 +36,12 @@
       - sendy_install_zip_src | length > 0
       - sendy_install_url | length > 0
       - sendy_install_db_password | length > 0
+      - sendy_install_db_admin_user | length > 0
+      - sendy_install_db_admin_password | length > 0
     fail_msg: >
       One or more required variables are empty. Set sendy_install_zip_src,
-      sendy_install_url, and sendy_install_db_password in host_vars
-      before running this role.
+      sendy_install_url, sendy_install_db_password, sendy_install_db_admin_user,
+      and sendy_install_db_admin_password in host_vars before running this role.
     quiet: true
 
 - name: "Preflight | Check that the Sendy zip exists on the control node"
